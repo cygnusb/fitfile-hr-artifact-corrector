@@ -1,6 +1,6 @@
 # fitfile-hr-artifact-corrector
 
-FIT heart-rate artifact correction toolkit with offline ML training and CLI/MCP inference.
+FIT heart-rate artifact correction toolkit with offline ML training, a CLI, and an MCP Server for tool-based integration.
 
 ## What this project does
 
@@ -8,6 +8,7 @@ FIT heart-rate artifact correction toolkit with offline ML training and CLI/MCP 
 - Detects likely optical HR artifacts.
 - Replaces artifact points with model predictions.
 - Exports correction audit data (`original_hr`, `corrected_hr`, `confidence`, `artifact_flag`).
+- Provides an MCP Server exposing correction/export tools for agent workflows.
 - Plots HR before/after correction (optionally with power overlay and corrected-region highlighting).
 
 The current pipeline is optimized for cycling FIT data.
