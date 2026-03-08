@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Local datasets and generated artifacts
+hr-chest/
+hr-optical/
+models/
+outputs/
+*.fit
+*.fit.gz
+*.png
+*.json
+
+# Keep code/docs tracked; if needed, remove broad patterns above and add files explicitly.

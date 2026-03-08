@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fitfile-hr-artifact-corrector"
+version = "0.1.0"
+description = "FIT heart-rate artifact analysis and correction with MCP tools"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "fitfile-hr-artifact-corrector" }]
+dependencies = [
+  "fitdecode>=0.11.0",
+  "numpy>=1.26",
+  "torch>=2.2",
+  "PyYAML>=6.0",
+  "fit-tool>=0.9",
+  "mcp>=1.2",
+]
+
+[project.scripts]
+hf-corrector = "hf_corrector.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

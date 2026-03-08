@@ -1,0 +1,2 @@
+[console_scripts]
+hf-corrector = hf_corrector.cli:main

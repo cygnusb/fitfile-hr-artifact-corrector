@@ -1,0 +1,65 @@
+Metadata-Version: 2.4
+Name: fitfile-mcp
+Version: 0.1.0
+Summary: FIT heart-rate artifact analysis and correction with MCP tools
+Author: fitfile-mcp
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: fitdecode>=0.11.0
+Requires-Dist: numpy>=1.26
+Requires-Dist: torch>=2.2
+Requires-Dist: PyYAML>=6.0
+Requires-Dist: fit-tool>=0.9
+Requires-Dist: mcp>=1.2
+
+# fitfile-mcp
+
+Offline training and MCP-serving pipeline for heart-rate artifact correction in FIT activity files.
+
+## Quick start
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+Analyze a FIT file:
+
+```bash
+hf-corrector analyze --fit /path/to/activity.fit
+```
+
+Train a model from unpaired data:
+
+```bash
+hf-corrector train --manifest train_manifest.yaml --out models/model_v1
+```
+
+Correct and export:
+
+```bash
+hf-corrector correct --fit /path/to/activity.fit --model models/model_v1 --mode balanced --out outputs/run1/correction.json
+hf-corrector export --fit /path/to/activity.fit --correction outputs/run1/correction.json --out-dir outputs/run1 --formats csv fit
+```
+
+Start MCP server:
+
+```bash
+python -m hf_corrector.mcp_server --model-dir models/model_v1
+```
+
+## Manifest format
+
+```yaml
+chest_strap_files:
+  - /data/chest/file1.fit
+  - /data/chest/file2.fit
+optical_files:
+  - /data/optical/fileA.fit
+  - /data/optical/fileB.fit
+```
+
+## Notes
+
+- Training prefers Apple Silicon `mps` when available, otherwise falls back to CPU.
