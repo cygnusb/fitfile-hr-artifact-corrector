@@ -15,6 +15,7 @@ class CorrectionConfig:
     threshold: float = 0.5
     mode: str = "balanced"
     hr_bias: float = 0.0
+    use_mc_uncertainty: bool = True
 
 
 def _threshold_for_mode(mode: str) -> float:
@@ -35,7 +36,14 @@ def correct_records(
     config.threshold = _threshold_for_mode(config.mode)
 
     x = build_feature_matrix(records)
-    pred = model.predict(x)
+
+    # Use MC-Dropout uncertainty when available
+    if config.use_mc_uncertainty and hasattr(model, "predict_with_uncertainty"):
+        pred, uncertainty = model.predict_with_uncertainty(x)
+    else:
+        pred = model.predict(x)
+        uncertainty = np.zeros(len(pred), dtype=float)
+
     probs = artifact_probability(records, detector_cfg)
     pred = _calibrate_predictions(records, pred, probs)
     flags = artifact_flags(probs, threshold=config.threshold)
@@ -48,8 +56,14 @@ def correct_records(
         corrected = pred[i] if replaced else orig
         if replaced and corrected is not None and config.hr_bias != 0.0:
             corrected = float(corrected + config.hr_bias)
-        conf = 1.0 - abs(float(probs[i]) - config.threshold)
-        conf = float(np.clip(conf, 0.0, 1.0))
+
+        # Confidence from MC-Dropout uncertainty (lower std = higher confidence)
+        if uncertainty[i] > 0:
+            mc_conf = float(np.clip(1.0 - uncertainty[i] / 10.0, 0.0, 1.0))
+        else:
+            mc_conf = 1.0 - abs(float(probs[i]) - config.threshold)
+        conf = float(np.clip(mc_conf, 0.0, 1.0))
+
         if corrected is not None:
             corrected = float(np.clip(corrected, 45.0, 210.0))
         corrected_vals.append(corrected)

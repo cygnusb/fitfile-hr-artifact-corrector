@@ -18,10 +18,44 @@ class DetectorConfig:
     max_drop_bpm_per_s: float = 3.0
     abrupt_drop_bpm: float = 10.0
     high_hr_low_power_score: float = 0.0
+    adaptive: bool = True
+
+
+def _compute_adaptive_thresholds(records: list[FitRecord], cfg: DetectorConfig) -> DetectorConfig:
+    """Derive per-ride thresholds from the ride's own HR/power distribution."""
+    hrs = [r.heart_rate for r in records if r.heart_rate is not None]
+    powers = [r.power for r in records if r.power is not None and r.power > 0]
+
+    if len(hrs) < 60 or len(powers) < 60:
+        return cfg
+
+    hr_arr = np.asarray(hrs, dtype=float)
+    pw_arr = np.asarray(powers, dtype=float)
+
+    hr_p10 = float(np.percentile(hr_arr, 10))
+    hr_p90 = float(np.percentile(hr_arr, 90))
+    pw_median = float(np.median(pw_arr))
+
+    adapted = DetectorConfig(
+        low_hr_threshold=max(hr_p10 + 5.0, 70.0),
+        low_hr_power_threshold=max(pw_median * 0.7, 80.0),
+        high_hr_threshold=min(hr_p90 + 10.0, 200.0),
+        high_hr_power_threshold=cfg.high_hr_power_threshold,
+        jump_bpm_threshold=max(float(np.std(np.diff(hr_arr))) * 3.0, 12.0),
+        jump_power_delta_max=cfg.jump_power_delta_max,
+        max_drop_bpm_per_s=cfg.max_drop_bpm_per_s,
+        abrupt_drop_bpm=cfg.abrupt_drop_bpm,
+        high_hr_low_power_score=cfg.high_hr_low_power_score,
+        adaptive=False,
+    )
+    return adapted
 
 
 def artifact_probability(records: list[FitRecord], cfg: DetectorConfig | None = None) -> np.ndarray:
     cfg = cfg or DetectorConfig()
+    if cfg.adaptive:
+        cfg = _compute_adaptive_thresholds(records, cfg)
+
     probs = np.zeros(len(records), dtype=float)
 
     for i, r in enumerate(records):

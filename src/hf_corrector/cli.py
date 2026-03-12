@@ -12,7 +12,7 @@ from .export import export_outputs, load_correction_json, save_correction_json
 from .io_fit import load_fit_records
 from .model import HRModel, pick_compute_device
 from .qa import analyze_chest_directory
-from .training import train_from_manifest
+from .training import train_from_combined_directories, train_from_manifest
 
 
 def cmd_train(args: argparse.Namespace) -> int:
@@ -28,6 +28,32 @@ def cmd_train(args: argparse.Namespace) -> int:
         lambda_dynamics=args.lambda_dynamics,
         max_drop_bpm_per_step=args.max_drop_bpm_per_step,
         max_windows=args.max_windows,
+        patience=args.patience,
+        val_fraction=args.val_fraction,
+    )
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+def cmd_train_combined(args: argparse.Namespace) -> int:
+    result = train_from_combined_directories(
+        chest_dir=args.chest_dir,
+        tours_dir=args.tours_dir,
+        out_dir=args.out,
+        device=args.device,
+        seq_len=args.seq_len,
+        stride=args.stride,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        lr=args.lr,
+        lambda_dynamics=args.lambda_dynamics,
+        max_drop_bpm_per_step=args.max_drop_bpm_per_step,
+        max_windows=args.max_windows,
+        patience=args.patience,
+        val_fraction=args.val_fraction,
+        pair_match_max_seconds=args.pair_match_max_seconds,
+        paired_weight=args.paired_weight,
+        min_paired_points=args.min_paired_points,
     )
     print(json.dumps(result, indent=2))
     return 0
@@ -74,7 +100,6 @@ def cmd_self_check(args: argparse.Namespace) -> int:
         "numpy",
         "torch",
         "yaml",
-        "fit_tool",
         "mcp",
     ]
 
@@ -133,7 +158,29 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--lambda-dynamics", type=float, default=0.35)
     train.add_argument("--max-drop-bpm-per-step", type=float, default=1.2)
     train.add_argument("--max-windows", type=int, default=40000)
+    train.add_argument("--patience", type=int, default=5)
+    train.add_argument("--val-fraction", type=float, default=0.15)
     train.set_defaults(func=cmd_train)
+
+    train_combined = sp.add_parser("train-combined")
+    train_combined.add_argument("--chest-dir", required=True)
+    train_combined.add_argument("--tours-dir", required=True)
+    train_combined.add_argument("--out", required=True)
+    train_combined.add_argument("--device", choices=["auto", "mps", "cpu"], default="auto")
+    train_combined.add_argument("--seq-len", type=int, default=120)
+    train_combined.add_argument("--stride", type=int, default=10)
+    train_combined.add_argument("--epochs", type=int, default=12)
+    train_combined.add_argument("--batch-size", type=int, default=64)
+    train_combined.add_argument("--lr", type=float, default=1e-3)
+    train_combined.add_argument("--lambda-dynamics", type=float, default=0.35)
+    train_combined.add_argument("--max-drop-bpm-per-step", type=float, default=1.2)
+    train_combined.add_argument("--max-windows", type=int, default=40000)
+    train_combined.add_argument("--patience", type=int, default=5)
+    train_combined.add_argument("--val-fraction", type=float, default=0.15)
+    train_combined.add_argument("--pair-match-max-seconds", type=float, default=2.0)
+    train_combined.add_argument("--paired-weight", type=int, default=3)
+    train_combined.add_argument("--min-paired-points", type=int, default=600)
+    train_combined.set_defaults(func=cmd_train_combined)
 
     analyze = sp.add_parser("analyze")
     analyze.add_argument("--fit", required=True)

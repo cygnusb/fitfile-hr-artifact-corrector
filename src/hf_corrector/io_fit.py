@@ -3,10 +3,12 @@ from __future__ import annotations
 import csv
 import gzip
 import shutil
+import struct
 from datetime import datetime
 from pathlib import Path
 
 import fitdecode
+from fitdecode.utils import compute_crc
 
 from .types import FitRecord
 
@@ -69,33 +71,58 @@ def rewrite_fit_heart_rate(
     output_fit: str | Path,
     corrections_by_ts: dict[str, float],
 ) -> None:
-    """Rewrite FIT heart_rate values if optional fit-tool is available."""
-    try:
-        from fit_tool.fit_file import FitFile
-        from fit_tool.profile.messages.record_message import RecordMessage
-    except ImportError as exc:
-        raise RuntimeError(
-            "FIT rewrite requires optional dependency 'fit-tool'. "
-            "Install with: pip install -e .[rewrite]"
-        ) from exc
-
+    """Rewrite FIT heart_rate values using in-place binary patching via fitdecode."""
     input_path = _resolve_fit_path(input_fit)
-    fitfile = FitFile.from_file(str(input_path))
-    for msg in fitfile.messages:
-        if not isinstance(msg, RecordMessage):
-            continue
-        ts = msg.get_value("timestamp")
-        if ts is None:
-            continue
-        key = ts.isoformat()
-        corrected = corrections_by_ts.get(key)
-        if corrected is None:
-            continue
-        msg.set_value("heart_rate", int(round(corrected)))
+    data = bytearray(input_path.read_bytes())
+
+    # local_mesg_num → byte offset of heart_rate field within data body (after 1-byte header)
+    record_hr_offsets: dict[int, int] = {}
+    patches: list[tuple[int, int]] = []
+
+    with fitdecode.FitReader(str(input_path), keep_raw_chunks=True) as reader:
+        for frame in reader:
+            if isinstance(frame, fitdecode.FitDefinitionMessage):
+                if frame.name != "record":
+                    continue
+                byte_offset = 0
+                hr_offset = None
+                for field_def in frame.field_defs:
+                    if field_def.name == "heart_rate":
+                        hr_offset = byte_offset
+                        break
+                    byte_offset += field_def.size
+                if hr_offset is not None:
+                    record_hr_offsets[frame.local_mesg_num] = hr_offset
+                else:
+                    record_hr_offsets.pop(frame.local_mesg_num, None)
+
+            elif isinstance(frame, fitdecode.FitDataMessage):
+                if frame.name != "record":
+                    continue
+                if frame.local_mesg_num not in record_hr_offsets:
+                    continue
+                try:
+                    ts = frame.get_value("timestamp")
+                except KeyError:
+                    continue
+                if not isinstance(ts, datetime):
+                    continue
+                corrected = corrections_by_ts.get(ts.isoformat())
+                if corrected is None:
+                    continue
+                new_hr = max(0, min(255, int(round(corrected))))
+                abs_offset = frame.chunk.offset + 1 + record_hr_offsets[frame.local_mesg_num]
+                patches.append((abs_offset, new_hr))
+
+    for abs_offset, new_hr in patches:
+        data[abs_offset] = new_hr
+
+    new_crc = compute_crc(data, start=0, end=len(data) - 2)
+    struct.pack_into("<H", data, len(data) - 2, new_crc)
 
     out = Path(output_fit)
     out.parent.mkdir(parents=True, exist_ok=True)
-    fitfile.to_file(str(out))
+    out.write_bytes(data)
 
 
 def _safe_float(value: object) -> float | None:

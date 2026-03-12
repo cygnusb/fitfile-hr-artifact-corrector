@@ -1,12 +1,14 @@
 # Python
 __pycache__/
 *.pyc
+.idea/
 .venv/
 *.egg-info/
 
 # Local datasets and generated artifacts
 hr-chest/
 hr-optical/
+touren/
 models/
 outputs/
 *.fit
