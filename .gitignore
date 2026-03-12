@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 .idea/
 .venv/
+out/
 *.egg-info/
 
 # Local datasets and generated artifacts
